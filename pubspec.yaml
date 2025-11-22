@@ -1,7 +1,8 @@
 name: gesture_recorder
 description: "gesture_recorder enables you to record and replay gesture events"
 version: 0.1.0
-homepage:
+homepage: https://github.com/chooyan-eng/gesture_recorder
+repository: https://github.com/chooyan-eng/gesture_recorder
 
 environment:
   sdk: '>=3.4.1 <4.0.0'

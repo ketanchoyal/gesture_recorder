@@ -2,18 +2,34 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+/// A tuple of [PointerDataPacket] and [DateTime] when the packet was captured.
 typedef CapturedPointerData = ({PointerDataPacket packet, DateTime timestamp});
 
+/// The state of the gesture recorder.
 enum RecordState { none, recording, playing }
 
+/// A widget that records all the gesture events happening during recording.
+///
+/// [GestureRecorder] captures all the gesture events reported by the platform and
+/// expose [List<CapturedPointerData>] as a result of recording.
+///
+/// [GestureRecorder] must be placed at the root (or almost root) of the widget tree
+/// so that its descendant can call [start], [stop], and [replay] methods
+/// by finding [GestureRecorder] as the result of traversing [BuildContext].
+///
+/// Once the value of [List<CapturedPointerData>] is obtained by [stop] method,
+/// you can replay the recorded events by calling [replay] method with passing the value as-is.
 class GestureRecorder extends StatefulWidget {
   const GestureRecorder({super.key, required this.child});
 
+  /// The child widget.
   final Widget child;
 
+  /// Returns the current state of the gesture recorder.
+  /// Once the state changes, the dependent widgets are rebuilt.
   static RecordState stateOf(BuildContext context) {
-    final state = context
-        .dependOnInheritedWidgetOfExactType<_GestureRecorderScope>();
+    final state =
+        context.dependOnInheritedWidgetOfExactType<_GestureRecorderScope>();
     assert(
       state != null,
       'GestureRecorder must be used within a GestureRecorder',
@@ -30,14 +46,18 @@ class GestureRecorder extends StatefulWidget {
     return state!;
   }
 
+  /// Starts recording gesture events.
   static void start(BuildContext context) async {
     _of(context)._start();
   }
 
+  /// Stops recording gesture events and returns the recorded event data.
   static Future<List<CapturedPointerData>> stop(BuildContext context) async {
     return _of(context)._stop();
   }
 
+  /// Replays the recorded gesture events.
+  /// [pointerHistory] is typically obtained by [stop] method.
   static Future<void> replay(
     BuildContext context,
     List<CapturedPointerData> pointerHistory,
@@ -45,10 +65,13 @@ class GestureRecorder extends StatefulWidget {
     return _of(context)._replay(pointerHistory);
   }
 
+  /// Creates [_GestureRecorderState] instance for Flutter framework.
   @override
   State<GestureRecorder> createState() => _GestureRecorderState();
 }
 
+/// The state of the gesture recorder.
+/// This operates a recording and replaying of gesture events.
 class _GestureRecorderState extends State<GestureRecorder> {
   final List<CapturedPointerData> _pointerData = [];
   void Function()? _restoreFunc;
@@ -67,8 +90,8 @@ class _GestureRecorderState extends State<GestureRecorder> {
       }
 
       PlatformDispatcher.instance.onPointerDataPacket = wrappedFunc;
-      _restoreFunc = () =>
-          PlatformDispatcher.instance.onPointerDataPacket = dispatcher;
+      _restoreFunc =
+          () => PlatformDispatcher.instance.onPointerDataPacket = dispatcher;
     }
   }
 
@@ -119,6 +142,7 @@ class _GestureRecorderState extends State<GestureRecorder> {
   }
 }
 
+/// An [InheritedWidget] that provides the current state of the gesture recorder.
 class _GestureRecorderScope extends InheritedWidget {
   const _GestureRecorderScope({required super.child, required this.state});
 
