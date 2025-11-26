@@ -9,6 +9,9 @@ The recorded data can be replayed, which means you can duplicate exactly the sam
 
 - [x] record / replay
 - [x] persist recorded data
+- [x] inspect recorded data on DevTools
+- [x] save recorded data from DevTools to IDE
+- [x] load recorded data from IDE to DevTools
 - [ ] edit / mimic gesture event on DevTools
 
 ## Getting started
@@ -66,6 +69,17 @@ await GestureRecorder.replay(context, data);
 ```
 
 This enables you to persist gesture sessions between app launches or share them between devices.
+
+## DevTools Extensions
+
+gesture_recorder provides DevTools Extensions.
+
+By using the tool, you can:
+
+- inspect recorded gesture data
+- save the recorded data to connecting IDE
+- load the recorded data from connecting IDE
+- replay recorded data on the connected device
 
 # Contact
 
