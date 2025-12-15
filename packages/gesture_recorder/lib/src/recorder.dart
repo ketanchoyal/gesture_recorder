@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:developer' as devtools;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'pointer_visualizer.dart';
 import 'recorded_data.dart';
 import 'serialization.dart';
 
@@ -22,10 +24,33 @@ enum RecordState { none, recording, playing }
 /// Once the value of [RecordedGestureData] is obtained by [stop] method,
 /// you can replay the recorded events by calling [replay] method with passing the value as-is.
 class GestureRecorder extends StatefulWidget {
-  const GestureRecorder({super.key, required this.child});
+  const GestureRecorder({
+    super.key,
+    required this.child,
+    this.customMarker,
+    this.markerSize = 25.0,
+    this.markerColor = Colors.grey,
+    this.textDirection = TextDirection.ltr,
+  });
 
   /// The child widget.
   final Widget child;
+
+  /// The diameter of each pointer marker
+  final double markerSize;
+
+  /// The color scheme for pointer markers
+  final Color markerColor;
+
+  /// Custom widget to display instead of the default marker.
+  ///
+  /// Ensure [markerSize] is set appropriately to align the custom widget
+  final Widget? customMarker;
+
+  /// The text direction for positioning markers
+  ///
+  /// Only used if [GestureRecorder] is passed before MaterialApp or CupertinoApp
+  final TextDirection textDirection;
 
   /// Returns the current state of the gesture recorder.
   /// Once the state changes, the dependent widgets are rebuilt.
@@ -73,18 +98,58 @@ class GestureRecorder extends StatefulWidget {
 }
 
 /// The state of the gesture recorder.
-/// This operates a recording and replaying of gesture events.
 class _GestureRecorderState extends State<GestureRecorder> {
   final List<RecordedEvent> _events = [];
   Size? _screenSize;
   DateTime? _previousTimestamp;
   void Function()? _restoreFunc;
   RecordState _state = RecordState.none;
+  late PointerVisualizerController _visualizerController;
   static const _devtoolsServiceMethod = 'ext.gesture_recorder.pushRecordedData';
   static const _devtoolsServiceReplay =
       'ext.gesture_recorder.replayRecordedData';
   static const _devtoolsServiceStart = 'ext.gesture_recorder.startRecordedData';
   static const _devtoolsServiceStop = 'ext.gesture_recorder.stopRecordedData';
+
+  @override
+  void initState() {
+    super.initState();
+    _visualizerController = PointerVisualizerController();
+    if (kDebugMode) {
+      devtools.registerExtension(_devtoolsServiceReplay,
+          (method, parameters) async {
+        final value = parameters['data'];
+
+        if (value == null) {
+          return devtools.ServiceExtensionResponse.result(jsonEncode({}));
+        }
+
+        _replay(value.toData());
+        // Respond with a JSON message, in this case no need, so I left it empty.
+        return devtools.ServiceExtensionResponse.result(jsonEncode({}));
+      });
+
+      devtools.registerExtension(_devtoolsServiceStart,
+          (method, parameters) async {
+        _start();
+        // Respond with a JSON message, in this case no need, so I left it empty.
+        return devtools.ServiceExtensionResponse.result(jsonEncode({}));
+      });
+
+      devtools.registerExtension(_devtoolsServiceStop,
+          (method, parameters) async {
+        _stop();
+        // Respond with a JSON message, in this case no need, so I left it empty.
+        return devtools.ServiceExtensionResponse.result(jsonEncode({}));
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _visualizerController.dispose();
+    super.dispose();
+  }
 
   void _start() {
     final dispatcher = PlatformDispatcher.instance.onPointerDataPacket;
@@ -135,6 +200,7 @@ class _GestureRecorderState extends State<GestureRecorder> {
     setState(() {
       _state = RecordState.none;
     });
+    _visualizerController.disable();
 
     if (_restoreFunc != null) {
       _restoreFunc!();
@@ -157,7 +223,9 @@ class _GestureRecorderState extends State<GestureRecorder> {
 
   void _pushRecordedDataToDevTools(RecordedGestureData data) {
     final serialized = data.toJson();
-    devtools.postEvent(_devtoolsServiceMethod, {'value': serialized});
+    if (kDebugMode) {
+      devtools.postEvent(_devtoolsServiceMethod, {'value': serialized});
+    }
   }
 
   Future<void> _replay(RecordedGestureData recordedData) async {
@@ -165,7 +233,7 @@ class _GestureRecorderState extends State<GestureRecorder> {
     if (dispatcher == null) {
       return;
     }
-
+    _visualizerController.enable();
     setState(() {
       _state = RecordState.playing;
     });
@@ -180,42 +248,22 @@ class _GestureRecorderState extends State<GestureRecorder> {
     setState(() {
       _state = RecordState.none;
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    devtools.registerExtension(_devtoolsServiceReplay,
-        (method, parameters) async {
-      final value = parameters['data'];
-
-      if (value == null) {
-        return devtools.ServiceExtensionResponse.result(jsonEncode({}));
-      }
-
-      _replay(value.toData());
-      // Respond with a JSON message, in this case no need, so I left it empty.
-      return devtools.ServiceExtensionResponse.result(jsonEncode({}));
-    });
-
-    devtools.registerExtension(_devtoolsServiceStart,
-        (method, parameters) async {
-      _start();
-      // Respond with a JSON message, in this case no need, so I left it empty.
-      return devtools.ServiceExtensionResponse.result(jsonEncode({}));
-    });
-
-    devtools.registerExtension(_devtoolsServiceStop,
-        (method, parameters) async {
-      _stop();
-      // Respond with a JSON message, in this case no need, so I left it empty.
-      return devtools.ServiceExtensionResponse.result(jsonEncode({}));
-    });
+    _visualizerController.disable();
   }
 
   @override
   Widget build(BuildContext context) {
-    return _GestureRecorderScope(state: _state, child: widget.child);
+    return PointerVisualizer(
+      controller: _visualizerController,
+      markerColor: widget.markerColor,
+      markerSize: widget.markerSize,
+      customMarker: widget.customMarker,
+      textDirection: widget.textDirection,
+      child: _GestureRecorderScope(
+        state: _state,
+        child: widget.child,
+      ),
+    );
   }
 }
 
